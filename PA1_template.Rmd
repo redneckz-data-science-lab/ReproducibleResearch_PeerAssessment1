@@ -38,13 +38,20 @@ with(list(d = total.steps.per.day), {
 Mean of the total number of steps taken per day:
 
 ```{r}
-mean(total.steps.per.day[["total.steps"]])
+# Vector of dates without measurements
+empty.dates <- activities.data.table[, all(is.na(steps)), by = date][V1 == T][["date"]]
+# Excluding empty dates
+normal.total.steps.per.day <- total.steps.per.day[!(date %in% empty.dates)]
+mean.total.steps.per.day <- mean(normal.total.steps.per.day[["total.steps"]])
+print(mean.total.steps.per.day)
 ```
 
 Median of the total number of steps taken per day:
 
 ```{r}
-median(total.steps.per.day[["total.steps"]])
+# Excluding empty dates
+median.total.steps.per.day <- median(normal.total.steps.per.day[["total.steps"]])
+print(median.total.steps.per.day)
 ```
 
 ## What is the average daily activity pattern?
@@ -54,20 +61,15 @@ The 5-minute interval (x-axis) and the average number of steps taken, averaged a
 ```{r}
 avg.steps.number.per.interval <- activities.data.table[, mean(steps, na.rm = T), by = interval]
 with(list(d = avg.steps.number.per.interval), {
-    d[, total.steps := V1]; d[, V1 := NULL]
+    d[, total.steps := V1]
     plot(total.steps ~ interval, data = d, type = "l",
-         main = "The 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)",
-         xlab = "5-minute interval", ylab = "Total steps")
+         main = "Average number of steps per interval (avg-ed across all days)",
+         xlab = "5-minute interval", ylab = "Avg. steps number")
 })
 ```
 
-Average steps per interval summary
 
-```{r}
-summary(avg.steps.number.per.interval)
-```
-
-Interval, on average across all the days in the dataset, contains the maximum number of steps
+Interval, on average across all the days in the dataset, contains the maximum number of steps:
 
 ```{r}
 with(list(d = avg.steps.number.per.interval), {
@@ -79,6 +81,83 @@ with(list(d = avg.steps.number.per.interval), {
 
 ## Imputing missing values
 
+Total number of missing values in the dataset:
 
+```{r}
+total.na.count <- sum(is.na(activities.data.table[["steps"]]))
+sprintf("%.0f%%", total.na.count * 100 / nrow(activities.data.table))
+```
+
+Total number of days with some missing values:
+
+```{r}
+sum(activities.data.table[, any(is.na(steps)), by = date][["V1"]])
+```
+
+Total number of days without measurements at all:
+
+```{r}
+sum(activities.data.table[, all(is.na(steps)), by = date][["V1"]])
+```
+
+The whole days are missing. That's why the *average number of steps per day* will be appropriate estimation for missing values:
+
+*Before imputing:*
+
+```{r}
+summary(activities.data.table)
+```
+
+*After imputing:*
+
+```{r}
+intervals.per.day <- activities.data.table[, .N, by = date][1][["N"]]
+# Estimation
+mean.total.steps.per.interval <- mean.total.steps.per.day / intervals.per.day
+
+# Corrected/imputed activities
+activities.imputed <- data.table(activities.data.table)
+invisible({
+    activities.imputed[, steps := as.numeric(steps)]
+    activities.imputed[is.na(steps), steps := mean.total.steps.per.interval]
+})
+summary(activities.imputed)
+```
+
+*Imputed data histogram* of the total number of steps taken each day *compared* to actual data:
+
+```{r}
+total.steps.per.day.imputed <- activities.imputed[, sum(steps), by = date]
+invisible({
+    with(list(d = total.steps.per.day.imputed), {
+        d[, total.steps := V1]
+        d[, V1 := NULL]
+        d[, imputed := T]
+    })
+    total.steps.per.day[, imputed := FALSE]
+})
+with(list(d = rbind(total.steps.per.day.imputed, total.steps.per.day)), {
+    #g <- ggplot(d, aes(date, total.steps, color = imputed)) +
+    #    geom_histogram(d[imputed == F], fill = "red", alpha = 0.3) +
+    #    geom_histogram(d[imputed == T], fill = "green", alpha = 0.3)
+    #print(g)
+})
+```
+
+*Imputed data mean* of the total number of steps taken per day *compared* to actual value:
+
+```{r}
+sprintf("Imputed vs Actual: %.1f vs %.1f", mean(total.steps.per.day.imputed[["total.steps"]]),
+        mean.total.steps.per.day)
+```
+
+So the mean has not changed ... as expected.
+
+*Imputed data median* of the total number of steps taken per day *compared* to actual value:
+
+```{r}
+sprintf("Imputed vs Actual: %.1f vs %.1f", median(total.steps.per.day.imputed[["total.steps"]]),
+        median.total.steps.per.day)
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
