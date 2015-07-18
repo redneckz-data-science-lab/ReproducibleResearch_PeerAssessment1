@@ -41,9 +41,10 @@ Histogram of the total number of steps taken each day:
 total.steps.per.day <- activities.data.table[, sum(steps, na.rm = TRUE), by = date]
 with(list(d = total.steps.per.day), {
     d[, total.steps := V1]; d[, V1 := NULL]
-    plot(total.steps ~ date, data = d, type = "h",
-         main = "The total number of steps taken each day",
-         xlab = "Date", ylab = "Total steps", col = "red")
+    ggplot(d, aes(total.steps)) +
+        geom_histogram(fill = "red", binwidth = max(total.steps.per.day$total.steps) / nrow(total.steps.per.day)) +
+        labs(title = "The total number of steps taken each day") +
+        labs(x = "Total steps", y = "")
 })
 ```
 
@@ -208,16 +209,15 @@ invisible({
     total.steps.per.day[, imputed := FALSE]
 })
 with(list(d = rbind(total.steps.per.day.imputed, total.steps.per.day)), {
-    #g <- ggplot(d, aes(date, total.steps, color = imputed)) +
-    #    geom_histogram(d[imputed == F], fill = "red", alpha = 0.3) +
-    #    geom_histogram(d[imputed == T], fill = "green", alpha = 0.3)
-    #print(g)
+    g <- ggplot(d, aes(total.steps, color = imputed)) +
+        facet_grid(imputed ~ .) +
+        geom_histogram(binwidth = max(total.steps.per.day$total.steps) / nrow(total.steps.per.day)) +
+        labs(x = "Total steps", y = "")
+    print(g)
 })
 ```
 
-```
-## NULL
-```
+![](PA1_template_files/figure-html/unnamed-chunk-13-1.png) 
 
 *Imputed data mean* of the total number of steps taken per day *compared* to actual value:
 
@@ -244,5 +244,7 @@ sprintf("Imputed vs Actual: %.1f vs %.1f", median(total.steps.per.day.imputed[["
 ```
 ## [1] "Imputed vs Actual: 10766.2 vs 10765.0"
 ```
+
+The median has became equal to the new mean value.
 
 ## Are there differences in activity patterns between weekdays and weekends?
