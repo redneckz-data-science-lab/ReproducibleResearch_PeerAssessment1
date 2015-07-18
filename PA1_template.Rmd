@@ -10,6 +10,7 @@ output:
 # Trying to load dependencies
 library(data.table)
 library(ggplot2)
+library(chron)
 ```
 
 ## Loading and preprocessing the data
@@ -62,8 +63,8 @@ The 5-minute interval (x-axis) and the average number of steps taken, averaged a
 ```{r}
 avg.steps.number.per.interval <- activities.data.table[, mean(steps, na.rm = T), by = interval]
 with(list(d = avg.steps.number.per.interval), {
-    d[, total.steps := V1]
-    plot(total.steps ~ interval, data = d, type = "l",
+    d[, avg.steps := V1]
+    plot(avg.steps ~ interval, data = d, type = "l",
          main = "Average number of steps per interval (avg-ed across all days)",
          xlab = "5-minute interval", ylab = "Avg. steps number")
 })
@@ -135,9 +136,16 @@ invisible({
         d[, V1 := NULL]
         d[, imputed := T]
     })
-    total.steps.per.day[, imputed := FALSE]
+    total.steps.per.day[, imputed := F]
 })
-with(list(d = rbind(total.steps.per.day.imputed, total.steps.per.day)), {
+total.steps.per.day.combined <- rbind(total.steps.per.day.imputed,
+                                      total.steps.per.day)
+invisible({
+    total.steps.per.day.combined[, imputed := factor(imputed,
+                                                     levels = c(T, F),
+                                                     labels = c("imputed", "actual"))]
+})
+with(list(d = total.steps.per.day.combined), {
     g <- ggplot(d, aes(total.steps, color = imputed)) +
         facet_grid(imputed ~ .) +
         geom_histogram(binwidth = max(total.steps.per.day$total.steps) / nrow(total.steps.per.day)) +
@@ -166,4 +174,26 @@ The median has became equal to the new mean value.
 
 ## Are there differences in activity patterns between weekdays and weekends?
 
+```{r}
+invisible({
+    activities.imputed[, day.type := factor(chron::is.weekend(date),
+                                          levels = c(T, F),
+                                          labels = c("weekend", "weekday"))]
+})
+```
 
+Panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis):
+
+```{r}
+avg.steps.number.per.day.type.interval <- activities.imputed[, mean(steps, na.rm = T),
+                                                             by = c("day.type", "interval")]
+with(list(d = avg.steps.number.per.day.type.interval), {
+    d[, avg.steps := V1]; d[,V1 := NULL]
+    g <- ggplot(d, aes(interval, avg.steps, color = day.type)) +
+        geom_line() +
+        facet_grid(day.type ~ .) +
+        labs(title = "Average number of steps per interval (avg-ed across all days)") +
+        labs(x = "5-minute interval", y = "Avg. steps number")
+    print(g)
+})
+```
